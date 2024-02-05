@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>ARBOL</title>
+</head>
+
+<body onload="init()">
+    <canvas id="myCanvas" width="640" height="480"></canvas>
+    <br>
+    Step: <input type="text" value="0.01" id="step">
+</body>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gl-matrix/3.4.2/gl-matrix-min.js"></script>
+<script id="shaderVs" type="x-shader/x-vertex">
+    attribute vec4 a_Position;
+    uniform mat4 u_Matrix; 
+    void main() {
+        gl_Position = u_Matrix * a_Position;
+    }
+</script>
+
+<script id="shaderFs" type="x-shader/x-fragment">
+    void main() {
+        gl_FragColor = vec4(0.0, 1.0, 0.0, 1.0);
+    }
+</script>
+
+<script>
+    var gl;
+    var count_x = 0.0;
+    var count_y = 0.0;
+    var scale = 1.0;
+    var giro_z = 0.0;
+    var pos = 0.0;
+    var vertices = new Float32Array([
+               0,  0.9, 0,  // Vertice #1 TRIANGULO1
+            -0.2,  0.6, 0, // Vertice #2
+             0.2,  0.6, 0, // Vertice #3
+               0,  0.7, 0,  // Vertice #1 TRIANGULO 2
+            -0.35, 0.3, 0, // Vertice #2
+             0.35, 0.3, 0, // Vertice #3
+               0,  0.5, 0,  // Vertice #1 TRIANGULO 3
+            -0.45,  0.0, 0, // Vertice #2
+             0.45,  0.0, 0, // Vertice #3
+               0,  0.3, 0,  // Vertice #1 TRIANGULO 4
+            -0.5, -0.3, 0, // Vertice #2
+             0.5, -0.3, 0, // Vertice #3
+             0.2, -0.2, 0,  // Vertice #1 TRIANGULO 5
+            -0.2, -0.2, 0, // Vertice #2
+            -0.2, -0.7, 0, // Vertice #3
+            -0.2, -0.7, 0,  // Vertice #1 TRIANGULO 6
+             0.2, -0.7, 0, // Vertice #2
+             0.2, -0.2, 0 // Vertice #3
+        ]);
+        function init() {
+            // Get canvas object from the DOM
+            var canvas = document.getElementById("myCanvas");
+
+            // Init WebGL context
+            gl = canvas.getContext("webgl");
+            if (!gl) {
+                console.log("Failed to get the rendering context for WebGL");
+                return;
+            }
+
+            // Init shaders
+            var vs = document.getElementById('shaderVs').innerHTML;
+            var fs = document.getElementById('shaderFs').innerHTML;
+            initShaders(gl, vs, fs);
+
+            // Write the positions of vertices to a vertex shader
+            initVertexBuffers(gl,vertices);
+
+            // Set clear canvas color
+            gl.clearColor(0.0, 0.0, 0.0, 1.0);
+
+            // Draw Scene
+            drawScene();
+        }
+    function drawScene() {
+           
+        
+        gl.clear(gl.COLOR_BUFFER_BIT);
+        
+        // MOVIMIENTO BASICO
+        var traslacion = glMatrix.mat4.fromTranslation(glMatrix.mat4.create(), [count_x, count_y, 0.0]);
+        var escalado = glMatrix.mat4.fromScaling(glMatrix.mat4.create(), [scale, scale, 0.0]);
+		var rotacion_z = glMatrix.mat4.fromZRotation(glMatrix.mat4.create(), giro_z);
+
+        //MULTIPLICACION DE MATRICES
+        var traslacion_escalado = glMatrix.mat4.multiply(glMatrix.mat4.create(), traslacion, escalado);
+		var traslacion_escalado_rotacionZ = glMatrix.mat4.multiply(glMatrix.mat4.create(), traslacion_escalado, rotacion_z);
+
+        // variable de uso 
+        matrix = traslacion_escalado_rotacionZ;
+
+        var mvMatrixUniform = gl.getUniformLocation(gl.program, "u_Matrix"); 
+        gl.uniformMatrix4fv(mvMatrixUniform, false, matrix);
+        
+        document.onkeydown = function (ev) {
+        var step = new Number(document.getElementById("step").value);
+        switch (ev.keyCode) {
+            case 37: // Movimiento Izquierda (Left)
+
+                // Call drawScene again in the next browser repaint
+                console.log('LEFT')
+                count_x -= step;
+
+            break;
+            case 39: // Movimiento Derecha (Right)
+
+                // Call drawScene again in the next browser repaint
+                console.log('RIGHT')
+                count_x += step;
+
+            break;
+            case 38: // Movimiento arriba (Up)
+
+                console.log('UP')
+                count_y += step;
+
+            break;
+            case 40: // Movimiento abajo (Down)
+                console.log('DOWN')
+                count_y -= step;
+
+            break;
+            case 33: // Escala mayor (PageUp)
+
+                console.log('SCALE +')
+                scale += step;
+
+            break;
+            case 34: // Escala menor (PageDown)
+            
+                console.log('SCALE -')
+                scale -= step;
+
+            break;
+            case 36: // Giro negativo en eje Z (HOME)
+            
+                console.log('Giro negativo en Z')
+                giro_z-=step
+
+            break
+            case 35: // Giro positivo en eje Z(End)
+            
+                console.log('Giro positivo en Z')
+                giro_z+=step
+            break;
+            case 107: // Movimiento triangulos IMPARES +  dejarlo en el 187 para entregar
+                console.log('FUNCIONA +')
+                pos += step ;
+                vertices = new Float32Array([
+                       0 +pos,  0.9, 0,  // Vertice #1 TRIANGULO1
+                    -0.2 +pos,  0.6, 0, // Vertice #2
+                     0.2 +pos,  0.6, 0, // Vertice #3
+                       0 -pos,  0.7, 0,  // Vertice #1 TRIANGULO 2
+                    -0.35-pos, 0.3, 0, // Vertice #2
+                     0.35-pos, 0.3, 0, // Vertice #3
+                       0 +pos,  0.5, 0,  // Vertice #1 TRIANGULO 3
+                    -0.45+pos,  0.0, 0, // Vertice #2
+                     0.45+pos,  0.0, 0, // Vertice #3
+                       0 -pos,  0.3, 0,  // Vertice #1 TRIANGULO 4
+                    -0.5 -pos, -0.3, 0, // Vertice #2
+                     0.5 -pos, -0.3, 0, // Vertice #3
+                     0.2, -0.2, 0,  // Vertice #1 TRIANGULO 5
+                    -0.2, -0.2, 0, // Vertice #2
+                    -0.2, -0.7, 0, // Vertice #3
+                    -0.2, -0.7, 0,  // Vertice #1 TRIANGULO 6
+                     0.2, -0.7, 0, // Vertice #2
+                     0.2, -0.2, 0 // Vertice #3
+                ]);
+                
+            break;
+            case 109: // Movimiento triangulos PARES - dejarlo en el 189 para entregar
+                console.log('FUNCIONA -')
+                pos -= step ;
+                vertices = new Float32Array([
+                    0 +pos,  0.9, 0,  // Vertice #1 TRIANGULO1
+                    -0.2 +pos,  0.6, 0, // Vertice #2
+                    0.2 +pos,  0.6, 0, // Vertice #3
+                    0 -pos,  0.7, 0,  // Vertice #1 TRIANGULO 2
+                    -0.35-pos, 0.3, 0, // Vertice #2
+                    0.35-pos, 0.3, 0, // Vertice #3
+                    0 +pos,  0.5, 0,  // Vertice #1 TRIANGULO 3
+                    -0.45+pos,  0.0, 0, // Vertice #2
+                    0.45+pos,  0.0, 0, // Vertice #3
+                    0 -pos,  0.3, 0,  // Vertice #1 TRIANGULO 4
+                    -0.5 -pos, -0.3, 0, // Vertice #2
+                    0.5 -pos, -0.3, 0, // Vertice #3
+                    0.2, -0.2, 0,  // Vertice #1 TRIANGULO 5
+                    -0.2, -0.2, 0, // Vertice #2
+                    -0.2, -0.7, 0, // Vertice #3
+                    -0.2, -0.7, 0,  // Vertice #1 TRIANGULO 6
+                    0.2, -0.7, 0, // Vertice #2
+                    0.2, -0.2, 0 // Vertice #3
+                ]);
+                
+
+            break;  
+        }
+        initVertexBuffers(gl,vertices);
+        };
+        
+        // Draw
+        gl.drawArrays(gl.TRIANGLES, 0, 18);
+
+        requestAnimationFrame(drawScene);
+        
+    }
+
+
+    function initVertexBuffers(gl,vertexx) {
+        // Vertices
+        // debemos de tener en cuenta el tamaño de los vertices y la dimension
+        var dim = 3;
+
+        // Create a buffer object
+        var vertexBuffer = gl.createBuffer();
+        if (!vertexBuffer) {
+            console.log('Failed to create the buffer object');
+            return -1;
+        }
+        gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, vertexx, gl.STATIC_DRAW);
+
+        // Assign the vertices in buffer object to a_Position variable
+        var a_Position = gl.getAttribLocation(gl.program, 'a_Position');
+        if (a_Position < 0) {
+            console.log('Failed to get the storage location of a_Position');
+            return -1;
+        }
+        gl.vertexAttribPointer(a_Position, dim, gl.FLOAT, false, 0, 0);
+        gl.enableVertexAttribArray(a_Position);
+
+    }
+
+    function initShaders(gl, vs_source, fs_source) {
+        // Compile shaders
+        var vertexShader = makeShader(gl, vs_source, gl.VERTEX_SHADER);
+        var fragmentShader = makeShader(gl, fs_source, gl.FRAGMENT_SHADER);
+
+        // Create program
+        var glProgram = gl.createProgram();
+
+        // Attach and link shaders to the program
+        gl.attachShader(glProgram, vertexShader);
+        gl.attachShader(glProgram, fragmentShader);
+        gl.linkProgram(glProgram);
+        if (!gl.getProgramParameter(glProgram, gl.LINK_STATUS)) {
+            alert("Unable to initialize the shader program");
+            return false;
+        }
+
+        // Use program
+        gl.useProgram(glProgram);
+        gl.program = glProgram;
+
+        return true;
+    }
+
+    function makeShader(gl, src, type) {
+        var shader = gl.createShader(type);
+        gl.shaderSource(shader, src);
+        gl.compileShader(shader);
+        if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+            alert("Error compiling shader: " + gl.getShaderInfoLog(shader));
+            return;
+        }
+        return shader;
+    }
+</script>
+
+</html>

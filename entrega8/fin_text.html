@@ -1,0 +1,575 @@
+<!--
+Autor: Pablo Esteban Camuendo Carlosama
+
+Partes implementadas:
+- Funcionalidad básica
+
+- Funcionalidad avanzada:
+   - Angulo de rebote variable
+   - Puntuacion por filas de bloques
+   - multiplicador de puntaje
+- Mejoras:
+   - sistema de vidas por pantalla
+   - mensajes de ganar y perder la partida
+   - movimiento de la esfera dependiendo el choque en los bloques
+   - texto en 3D para Score
+   
+
+-->
+<!DOCTYPE html>
+<html>
+
+<head>
+<title>BreakOut</title>
+<!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.148.0/three.min.js"></script> -->
+<script type="importmap">
+   {
+      "imports":{
+         "three": "./js/three.module.js",
+         "orbitControls": "./js/OrbitControls.js"
+      }
+   }
+</script>
+<script type = "module">
+   import{FontLoader} from './js/FontLoader.js';
+   import{TextGeometry} from './js/TextGeometry.js';
+   import * as THREE from 'three';
+
+   // VARIABLES GLOBALES
+   //Texto
+   var group;
+   var textMesh;
+
+   // vidas
+   var vida= 3;
+
+   // velocidad de esfera
+   var stepX = 0.2;
+   var stepY = 0.25;
+   
+   // condicionante de movimiento
+   var move=false;
+
+   // multiplicador de velocidad
+   var vel = 0.6;
+   var dir_x = 1;
+
+   // contador de bloques rotos
+   var num_block= 0;
+
+   // color de luces 
+   var color_light= 0xb4ff00;
+
+   //puntuacion de los bloques destruidos
+   var puntaje=0;
+   var puntos = 0;
+   var puntos1 = []
+   var puntos2 = []
+   var puntos3 = []
+   
+   // array para bloques a destruir
+   var blocks_f = []
+   init();
+   function init() {
+      var scene = new THREE.Scene();
+      var sceneWidth = window.innerWidth - 20;
+      var sceneHeight = window.innerHeight - 20;
+
+      new THREE.TextureLoader().load("fondos.jpg", function(texture) {
+         scene.background = texture;
+         texture.wrapS = texture.wrapT=THREE.RepeatWrapping;
+         texture.repeat.set(3,3)
+      });
+
+      var camera = new THREE.PerspectiveCamera(90, sceneWidth / sceneHeight, 0.01, 100);
+      camera.position.set(0, 0, 20); // Set the initial Camera Position.
+      camera.lookAt(scene.position);
+      
+      var renderer = new THREE.WebGLRenderer({
+         antialias : true
+      });
+      renderer.shadowMap.enabled = true;
+      renderer.setSize(sceneWidth, sceneHeight);
+      document.body.appendChild(renderer.domElement);
+
+      
+      // DECLARACION DE BASICOS
+
+      
+      // escenario
+      var leftBorder = getBorder("left", 1, 32, 5, -16, -0.5, 0,getVMaterial());//ancho, alto, ancho
+      var rightBorder = getBorder("right", 1, 32, 5, 16, -0.5, 0,getVMaterial());
+      var topBorder = getBorder("top", 31, 1, 5, 0, 15, 0,getHMaterial());
+      var gameoverBorder = getBorder("gameover", 33, 0.5, 5, 0, -16.5, 0,getGameOver());
+      var floor = getFloor(32,33,0,0,getFondoMaterial());
+      
+      scene.add(leftBorder);
+      scene.add(rightBorder);
+      scene.add(topBorder);
+      scene.add(gameoverBorder);
+      scene.add(floor);
+
+      // jugador
+      var downBorder = getBorder("user", 9, 1, 2.5, 0, -15, 2,getBaseMaterial());
+
+      scene.add(downBorder);
+      
+      
+      var sphere = getSphere(getSphereMaterial());
+      scene.add(sphere);
+
+
+      // bloques a romper
+      blocks(blocks_f,scene,13,getBlockMaterial3(),puntos3);
+      blocks(blocks_f,scene,10,getBlockMaterial2(),puntos2);
+      blocks(blocks_f,scene,7,getBlockMaterial2(),puntos2);
+      blocks(blocks_f,scene,4,getBlockMaterial1(),puntos1);
+      // console.log(blocks_f);
+      
+      // luces
+      var light_bal = getLight_bal(scene,sphere,color_light);
+      var light = getLight();
+      var light_vidas = getLight_vidas(scene,0xff3200)
+      
+      scene.add(light_bal);
+      scene.add(light_vidas);
+      scene.add(light);
+
+      // DECLARACIONES EXTRA
+      // añadimos vidas
+      var  vidas1 = Vidas(-22,8,0xff9700);
+      var  vidas2 = Vidas(-22,5,0xff6100);
+      var  vidas3 = Vidas(-22,2,0xa24700);
+      scene.add(vidas1);
+      scene.add(vidas2);
+      scene.add(vidas3);
+      // ESCENARIO PARA VIDAS
+      var l = getBorder("l", 0.5, 9.5, 1, -23.5, 5, 0.5,getVMaterial());//ancho, alto, ancho
+      var r = getBorder("r", 0.5, 9.5, 1, -20, 5, 0.5,getVMaterial());
+      var t = getBorder("t", 3.5, 0.5, 1, -21.75, 9.5, 0.5,getHMaterial());
+      var d = getBorder("d", 3.5, 0.5, 1, -21.75, 0.5, 0.5,getHMaterial());
+      var f = getFloor(3,9,-22,5,getVMaterial());
+      scene.add(l);
+      scene.add(r);
+      scene.add(t);
+      scene.add(d);
+      scene.add(f);
+
+      // Añadimos SCORE
+      group = new THREE.Group();
+      getText(group,'SCORE: ',15,10,5);   
+      scene.add(group);
+      //console.log(group)
+     
+      //console.log(downBorder.setSize)
+      // DECLARACION DE ARRAYS
+      var borders = [ leftBorder, rightBorder, topBorder, downBorder ];
+      
+      var vid_array = [vidas1,vidas2,vidas3];
+
+
+      document.onkeydown = function (ev) {
+        switch (ev.keyCode) {
+            // 32 space
+            //37 izquierda
+            //39 derecha
+            case 32:
+                move=true;
+            break;
+            case 37: // Movimiento izquierda
+            // colocar condicionales de espacio para que no atraviese las paredes
+            if(downBorder.position.x>=-10.1)
+            {
+               downBorder.position.x -= vel;
+            }
+               
+            break;
+            case 39: // Movimiento derecha
+            if(downBorder.position.x<=10.1){
+               downBorder.position.x += vel;
+            }
+               
+            break;
+        }
+      };
+      animate(sphere, borders,blocks_f, renderer, scene, camera,vid_array);
+   }
+   // FUNCION PARA AÑADIR BLOQUES POR FILA
+    function blocks(array, scene,y,material,puntos){
+      var i =0;
+      var obj =0;
+        for(i=0;i<6;i++){
+            var brick_f1 = getBrick(4,2,4 , (-12+5*i),y,0, material);
+            array.push(brick_f1);
+            puntos.push(brick_f1);
+            
+        }
+    
+        for(obj=0;obj<array.length;obj++){
+            scene.add(array[obj]);
+        }
+        
+    }
+    
+   function animate(sphere, borders,blocks_f, renderer, scene, camera,vid_array) {
+      // IMPLEMENTACION DEL FALLO
+      if(vida >0){
+         if(sphere.position.y < -15.5){
+            console.log('FALLO')
+            move = false
+            sphere.position.z = 1;
+            sphere.position.y = -13;
+            sphere.position.x = 0;
+            vida -=1;
+            scene.remove(vid_array.pop());
+            
+            //console.log('vidas',vid_array)
+         }
+      }
+      else{
+         window.alert('HAS PERDIDO')
+         location.reload();
+      }
+      
+      checkCollision(scene,sphere, borders,blocks_f);
+      if (move){
+         
+         sphere.position.x += stepX * dir_x;
+         sphere.position.y += stepY;
+      }
+      renderer.render(scene, camera);
+
+      renderer.setAnimationLoop( function() {
+         animate(sphere, borders,blocks_f, renderer, scene, camera,vid_array);
+      });
+   }
+
+   function getLight() {
+      var light = new THREE.DirectionalLight(0xffffff,0.7);
+      light.position.set(2, 2, 10);
+      light.castShadow = true;
+      light.shadow.camera.near = 0;
+      light.shadow.camera.far = 16;
+      light.shadow.camera.left = -15;
+      light.shadow.camera.right = 15;
+      light.shadow.camera.top = 20;
+      light.shadow.camera.bottom = -20;
+      light.shadow.mapSize.width = 4096;
+      light.shadow.mapSize.height = 4096;
+      
+      return light;
+   }
+   function getLight_bal(scene,sphere,color) {
+      var pointLight = new THREE.PointLight( color, 1, 50 );
+      pointLight.position.set(0,0,5)
+      pointLight.target = sphere;
+      pointLight.castShadow = true;
+      pointLight.shadow.camera.visible = true;
+      const helpers = new THREE.PointLightHelper(pointLight,1);
+      //scene.add(helpers);
+      return pointLight;
+   }   
+   function getLight_vidas(scene,color) {
+      var spotLight = new THREE.SpotLight( color);
+      spotLight.position.set(-22,5,1)
+      spotLight.target.position.set(-22,5,-5)
+      spotLight.castShadow = true;
+      spotLight.distance = 10
+      spotLight.angle = 2
+      spotLight.penumbra = 1
+      spotLight.intensity = 10
+      spotLight.shadow.mapSize.width = 1024;
+      spotLight.shadow.mapSize.height = 1024;
+      spotLight.shadow.camera.visible = true;
+      const helpers = new THREE.SpotLightHelper(spotLight);
+      //scene.add(helpers);
+      return spotLight;
+   }
+
+   function getSphere(material) {
+      var geometry = new THREE.SphereGeometry(1, 20, 20);
+      var mesh = new THREE.Mesh(geometry, material);
+      mesh.position.z = 1;
+      mesh.position.y = -13;
+      mesh.castShadow = true;
+      mesh.name = "sphere";
+
+      return mesh;
+
+   }
+   function Vidas(c_x,c_y,color_vida){
+      var geometry = new THREE.SphereGeometry(1, 20, 20);
+      var material = new THREE.MeshBasicMaterial({color: color_vida });
+      var mesh = new THREE.Mesh(geometry, material);
+      //mesh.emissive = 0xb4ff00
+      mesh.position.z = 0.5;
+      mesh.position.x = c_x;
+      mesh.position.y = c_y;
+      mesh.name = "vidas";
+      return mesh;
+   }
+   
+   function getText(group,text,x,y,z) {
+      var loader = new FontLoader();
+
+      loader.load('./js/helvetiker_regular.typeface.json', function( font){
+         
+         var geometry = new TextGeometry(text, {
+            font:font,
+            size: 1,
+            height:0.1,
+            curveSegments: 9,
+            bevelEnabled: false,
+            bevelThickness: 0.1,
+            bevelSize: 0.1,
+            bevelSegments:0.1,
+         });
+
+         var material = [
+            new THREE.MeshPhongMaterial({color:0xFF8000}), 
+            new THREE.MeshPhongMaterial({color:0xFFF300}), 
+         ];
+         textMesh = new THREE.Mesh(geometry, material);
+         textMesh.position.set(x, y, z);
+         group.add(textMesh)
+
+      });
+   }
+
+   function getBrick(sx,sy,sz,pX,pY,pZ,material) {
+    var geometry = new THREE.BoxGeometry(sx, sy, sz);
+      var mesh = new THREE.Mesh(geometry, material);
+      mesh.receiveShadow = true;
+      mesh.position.set(pX, pY, pZ);
+      mesh.name = name;
+      return mesh;
+   }
+
+   function getFloor(sx,sy,x,y,material) {
+      var geometry = new THREE.PlaneGeometry(sx, sy);
+      var mesh = new THREE.Mesh(geometry, material);
+      mesh.receiveShadow = true;
+      mesh.position.x = x;
+      mesh.position.y = y;
+      mesh.position.z = 0;
+
+      return mesh;
+   }
+
+   function getBorder(name, x, y, z, posX, posY, posZ,material) {
+      var geometry = new THREE.BoxGeometry(x, y, z);
+      var mesh = new THREE.Mesh(geometry, material);
+      mesh.receiveShadow = true;
+      mesh.position.set(posX, posY, posZ);
+      mesh.name = name;
+
+      return mesh;
+   }
+   
+   // MATERIALES
+   function getHMaterial() {
+      var texture = new THREE.TextureLoader().load("metal_h.jpg");
+      var material = new THREE.MeshPhysicalMaterial({
+         map : texture
+      });
+
+      return material;
+   }
+   function getVMaterial() {
+      var texture = new THREE.TextureLoader().load("metal_v.jpg");
+      var material = new THREE.MeshPhysicalMaterial({
+         map : texture
+      });
+      return material;
+   }
+   function getFondoMaterial() {
+      var texture = new THREE.TextureLoader().load("fondo.jpg");
+      var material = new THREE.MeshPhysicalMaterial({
+         map : texture
+      });
+      return material;
+   }
+
+   function getBaseMaterial() {
+      var texture = new THREE.TextureLoader().load("player.jpg");
+      var material = new THREE.MeshPhysicalMaterial({
+         map : texture
+      });
+      return material;
+   }
+
+   function getBlockMaterial1() {
+      var texture = new THREE.TextureLoader().load("block1.jpg");
+      var material = new THREE.MeshPhysicalMaterial({
+         map : texture
+      });
+
+      return material;
+   }
+
+   function getBlockMaterial2() {
+      var texture = new THREE.TextureLoader().load("block2.jpg");
+      var material = new THREE.MeshPhysicalMaterial({
+         map : texture
+      });
+
+
+      return material;
+   }
+
+   function getBlockMaterial3() {
+      var texture = new THREE.TextureLoader().load("block3.jpg");
+      var material = new THREE.MeshPhysicalMaterial({
+         map : texture
+      });
+   
+      return material;
+   }
+
+   function getSphereMaterial() {
+      var texture = new THREE.TextureLoader().load("esfera.jpg");
+      var material = new THREE.MeshPhysicalMaterial({
+         map : texture
+      });
+      return material;
+   }
+   function getGameOver() {
+      var texture = new THREE.TextureLoader().load("gameover.jpg");
+      var material = new THREE.MeshPhysicalMaterial({
+         map : texture
+      });
+
+      return material;
+   }
+
+
+   // para el angulo de rebote, si golpea calculo la distancia del centro del objeto a la pelota, si es pequeña no cambia si es grande combio el angulo de rebote
+   // para la velocidad de desplazamiento, si me desplazo mucho mas velocidad, cuando rebota y elimina el bloque, cuento el desplazamiento y la diferencia y cambio la velocidad.
+
+   function checkCollision(scene,sphere, borders,blocks_f) {
+      var originPosition = sphere.position.clone();
+
+      const positionAttribute = sphere.geometry.getAttribute( 'position' );
+      const localVertex = new THREE.Vector3();
+      const globalVertex = new THREE.Vector3();
+      for ( let vertexIndex = 0; vertexIndex < positionAttribute.count; vertexIndex ++ ) {
+         localVertex.fromBufferAttribute( positionAttribute, vertexIndex );
+         globalVertex.copy( localVertex ).applyMatrix4( sphere.matrixWorld );
+         var directionVector = globalVertex.sub(sphere.position);
+         var ray = new THREE.Raycaster(originPosition, directionVector.clone().normalize());
+         var collisionResults = ray.intersectObjects(borders);
+    
+         if (collisionResults.length > 0 && collisionResults[0].distance < directionVector.length()) {
+            // Collision detected
+            if (collisionResults[0].object.name == "left" || collisionResults[0].object.name == "right") {
+               stepX *= -1;
+            }
+            if (collisionResults[0].object.name == "user" || collisionResults[0].object.name == "top") {
+               stepY *= -1;
+               if(collisionResults[0].object.name == "user" ){            
+                  num_block= 0;
+
+                  // score
+                  puntaje = puntaje + puntos;
+                  puntos = 0;
+                  console.log('SCORE: ',puntaje)
+                  // eliminamos elementos del grup de texto
+                  group.remove(group.children[1])
+                  getText(group,String(puntaje),22,10,5);
+
+                  // calculamos distancias
+                  var dist_centro = Math.abs(collisionResults[0].object.position.x - sphere.position.x)
+                  //console.log(dist_centro)
+                  if(2> dist_centro > 0.5){
+                     dir_x = 3;
+                     
+                  }
+                  else if(dist_centro > 2){
+                     dir_x = 4;
+                     
+                  }
+                  else if(dist_centro <= 0.5){
+                     dir_x = 1.5;
+                     
+                  }
+
+                  if (blocks_f.length == 0){
+                     window.alert('HAS GANADO')
+                     location.reload();
+                  }
+                  //console.log(dir_x)
+               }
+               if(Math.abs(sphere.position.x)< Math.abs(collisionResults[0].object.position.x )){
+                     stepX *= -1;
+                     // console.log(Math.abs(sphere.position.x))
+                     // console.log(Math.abs(collisionResults[0].object.position.x ))
+                  }
+                  else{
+                     stepX *= 1;
+                     // console.log(Math.abs(sphere.position.x))
+                     // console.log(Math.abs(collisionResults[0].object.position.x ))
+                  }
+            }            
+            break;
+
+         }
+         
+         var collisionResults_blocks = ray.intersectObjects(blocks_f);
+
+         if (collisionResults_blocks.length > 0 && collisionResults_blocks[0].distance < directionVector.length()) {
+
+            // conteo de bloques chocados
+            num_block += 1;
+            //console.log('numero de bloques',num_block)
+            if (num_block>3){
+               
+               puntos = puntos * 2;
+            }
+            
+            // cambio de movimiento
+            stepY *= -1;
+            
+            // eliminamos bloque
+            var obj_delete = blocks_f.indexOf(collisionResults_blocks[0].object);
+            scene.remove(collisionResults_blocks[0].object);
+            blocks_f.splice(obj_delete,1);
+
+
+            // Para movimiento dependiendo de donde golpee en el bloque
+            //calculamos distancia para bloques
+            var dist_centro_block = Math.abs(collisionResults_blocks[0].object.position.y - sphere.position.y)
+
+            //console.log('centroo: ',dist_centro_block)
+            if(dist_centro_block>=0.5){
+               stepY*=1;
+               stepX*=-1;
+            }
+            else{
+               stepY *=-1;
+               stepX *=-1;
+            }
+            
+            // Para puntuacion
+            if (puntos1.includes(collisionResults_blocks[0].object)) {
+               
+               puntos += 1
+            }
+            else if (puntos2.includes(collisionResults_blocks[0].object)) {
+               
+               puntos += 2
+            }
+            else if (puntos3.includes(collisionResults_blocks[0].object)) {
+               
+               puntos += 3
+            }
+         }
+
+         
+      }
+   }
+</script>
+</head>
+
+<body></body>
+
+</html>

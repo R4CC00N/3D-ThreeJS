@@ -1,0 +1,23 @@
+body {
+    background-color: wheat;
+}
+h1 {
+      color: rgb(209, 43, 51);
+      font-size: 50px;
+      text-align: center;
+}
+p {
+    color: rgb(50, 54, 79);
+    font-size: 15px;
+    text-align: center;
+}
+button {
+    border: 3px solid rgb(175, 175, 175); /*anchura, estilo y color borde*/
+    padding: 10px; /*espacio alrededor texto*/
+    margin-left: 50%;
+    background-color: rgb(94, 131, 131); /*color botón*/
+    color: #ffffff; /*color texto*/
+    text-transform: uppercase; /*capitalización texto*/
+    font-family: 'Helvetica', sans-serif; /*tipografía texto*/
+    border-radius: 10px; /*bordes redondos*/
+}

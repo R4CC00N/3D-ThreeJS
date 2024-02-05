@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>ENTREGA 1</title>
+    </head>
+    <body onload="init()">
+        <canvas id="myCanvas" width="580" height="480"></canvas>
+    </body>
+
+    <script id="shaderVs" type="x-shader/x-vertex">
+        attribute vec4 a_Position;
+        attribute vec4 a_Color;
+        varying highp vec4 v_Color;
+        void main() {
+            gl_Position = a_Position;
+            v_Color = a_Color;
+        }
+    </script>
+    
+    <script id="shaderFs" type="x-shader/x-fragment">
+        varying highp vec4 v_Color;
+        void main() {
+            gl_FragColor = v_Color; 
+            
+        }
+        </script>
+        
+        <script>
+            // variables globales 
+            var mouseClickPoints = [];
+            var centros = [];
+            var vertices = [];
+            var colors = [];
+            var dim = 3;
+            function init() {
+                // Get canvas object from the DOM
+                var canvas = document.getElementById("myCanvas");
+
+                // Init WebGL context
+                var gl = canvas.getContext("webgl");
+
+                // Register event handler
+                canvas.onmousedown = function(ev) {
+                    click(ev, gl, canvas);
+                };
+
+                if (!gl) {
+                    console.log("Failed to get the rendering context for WebGL");
+                    return;
+                }
+
+                // Clear canvas
+                gl.clearColor(0.0, 0.0, 0.0, 1.0);
+                gl.clear(gl.COLOR_BUFFER_BIT);
+
+                // Init shaders
+                var vs = document.getElementById('shaderVs').innerHTML;
+                var fs = document.getElementById('shaderFs').innerHTML;
+
+
+                if (!initShaders(gl, vs, fs)) {
+                    console.log('Failed to intialize shaders.');
+                    return;
+                }
+                
+                var a_Position = gl.getAttribLocation(gl.program, "a_Position");
+                // 1. Array values
+                gl.vertexAttrib2fv(a_Position, vertices);
+
+                
+            }
+
+            function click(ev, gl, canvas) {
+                
+                // Coordinates of canvas origin
+                var rect = ev.target.getBoundingClientRect();
+                // relative x coordinate of click in canvas
+                var clickX = ev.clientX - rect.left;
+                // relative y coordinate of click in canvas
+                var clickY = ev.clientY - rect.top;
+                // WebGL coordinates (3D)
+                var halfCanvasWidth = canvas.width / 2;
+                var halfCanvasHeight = canvas.height / 2;
+                var x = (clickX - halfCanvasWidth) / halfCanvasWidth;
+                var y = (halfCanvasHeight - clickY) / halfCanvasHeight;
+                var xyz = [x, y, 0];
+                mouseClickPoints.push(xyz)
+
+//*****************************************************************************************************//
+
+                if (mouseClickPoints.length % 3 == 0){
+        
+                    for ( i=0 ; i < mouseClickPoints.length ; i++){
+                        //cosnole.log(mouseClickPoints[i])
+                        for ( j=0 ; j < mouseClickPoints[i].length ; j++){
+                            vertices.push(mouseClickPoints[i][j]);
+                        }
+
+                        if(i % 3 == 0){ //formula centroides
+                            
+                            Ox=(mouseClickPoints[i][0]+mouseClickPoints[i+1][0]+mouseClickPoints[i+2][0])/3;
+                            Oy=(mouseClickPoints[i][1]+mouseClickPoints[i+1][1]+mouseClickPoints[i+2][1])/3;
+                            centros.push(Ox,Oy);//coordenadas X e Y
+                        }
+                    }
+                    
+                    // ********************************** COLORES*****************************************//
+                    for ( c=0 ; c < centros.length ; c++){
+                        if (c % 2 == 0){
+                            if (centros[c]<0 && centros[c+1]>0)//Cuadrante 1
+                            {
+                                colors.push(0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0); //AZUL
+                            }
+                            if (centros[c]>0 && centros[c+1]>0)//Cuadrante 1
+                            {
+                                colors.push(1.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0, 1.0, 0.0); //AMARILLO
+                            }
+                            if (centros[c]<0 && centros[c+1]<0)//Cuadrante 1
+                            {
+                                colors.push(1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0); //ROJO
+                            }
+                            if (centros[c]>0 && centros[c+1]<0)//Cuadrante 1
+                            {
+                                colors.push(0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0); // VERDE
+                            }
+                        }
+                    }
+
+                    // llamamos a los buffers 
+                    var n = initVertexBuffers(gl)
+                    if (n < 0) {
+                        console.log('Failed to set the positions of the vertices');
+                        return;
+                    }
+
+                    // Clear canvas
+                    gl.clearColor(0.0, 0.0, 0.0, 1.0);
+                    gl.clear(gl.COLOR_BUFFER_BIT);
+                    // Draw TRIANGULOS
+                    gl.drawArrays(gl.TRIANGLES, 0, n);
+                    console.log('centros',centros)
+                    // vaciamos los arrays
+                    vertices = [];
+                    centros = [];
+                    //console.log('colores',colors)
+                    colors = [];
+                }
+                // console.log(mouseClickPoints)
+                // console.log('vertics',vertices)
+                // console.log('centros',centros)
+
+            }
+            function initVertexBuffers(gl) {
+
+                    // Buffer de colores
+                    var trianglesColorBuffer = gl.createBuffer();
+                    gl.bindBuffer(gl.ARRAY_BUFFER, trianglesColorBuffer);
+                    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(colors), gl.STATIC_DRAW);
+                    var a_Color = gl.getAttribLocation(gl.program, 'a_Color'); //pregunta donde tienes esa variable
+                    gl.vertexAttribPointer(a_Color, dim, gl.FLOAT, false, 0, 0);
+                    gl.enableVertexAttribArray(a_Color);
+
+
+                    // Create a buffer object
+                    gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
+                    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
+
+                    // Assign the vertices in buffer object to a_Position variable
+                    var a_Position = gl.getAttribLocation(gl.program, 'a_Position');
+                    gl.vertexAttribPointer(a_Position, 3, gl.FLOAT, false, 0, 0);
+                    gl.enableVertexAttribArray(a_Position);
+                    // Return number of vertices
+                    return vertices.length / dim;
+            }
+
+            function initShaders(gl, vs_source, fs_source) {
+                // Compile shaders
+                var vertexShader = makeShader(gl, vs_source, gl.VERTEX_SHADER);
+                var fragmentShader = makeShader(gl, fs_source, gl.FRAGMENT_SHADER);
+
+                // Create program
+                var glProgram = gl.createProgram();
+                
+                // Attach and link shaders to the program
+                gl.attachShader(glProgram, vertexShader);
+                gl.attachShader(glProgram, fragmentShader);
+                gl.linkProgram(glProgram);
+                if (!gl.getProgramParameter(glProgram, gl.LINK_STATUS)) {
+                    alert("Unable to initialize the shader program");
+                    return false;
+                }
+
+                // Use program
+                gl.useProgram(glProgram);
+                gl.program = glProgram;
+
+                return true;
+            }
+
+            function makeShader(gl, src, type) {
+                var shader = gl.createShader(type);
+                gl.shaderSource(shader, src);
+                gl.compileShader(shader);
+                if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+                    alert("Error compiling shader: " + gl.getShaderInfoLog(shader));
+                    return;
+                }
+                return shader;
+            }
+
+        </script>
+</html>

@@ -1,0 +1,444 @@
+<!--
+Autor: Pablo Esteban Camuendo Carlosama
+
+Partes implementadas:
+- Funcionalidad básica
+
+- Funcionalidad avanzada:
+   - 
+   - 
+- Mejoras:
+   - sistema de vidas por pantalla
+   - mensajes de ganar y perder la partida
+
+-->
+<!DOCTYPE html>
+<html>
+
+<head>
+<title>Three.js: Collision detection</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.148.0/three.min.js"></script>
+
+<script>
+   var vida= 3;
+   var stepX = 0.1;
+   var stepY = 0.15;
+   var move=false;
+   var vel = 0.6;
+   var dir_x = 1;
+   var num_block= 0;
+   var color_light= 0xb4ff00;
+   //puntuacion de los bloques destruidos
+   var puntaje=0;
+   var puntos = 0;
+   var puntos1 = []
+   var puntos2 = []
+   var puntos3 = []
+   
+   // array para bloques a destruir
+   var blocks_f = []
+
+   function init() {
+      var scene = new THREE.Scene();
+      var sceneWidth = window.innerWidth - 20;
+      var sceneHeight = window.innerHeight - 20;
+
+      new THREE.TextureLoader().load("background.jpg", function(texture) {
+         scene.background = texture;
+      });
+
+      var camera = new THREE.PerspectiveCamera(90, sceneWidth / sceneHeight, 0.01, 100);
+      camera.position.set(0, 0, 20); // Set the initial Camera Position.
+      camera.lookAt(scene.position);
+      
+      var renderer = new THREE.WebGLRenderer({
+         antialias : true
+      });
+      renderer.shadowMap.enabled = true;
+      renderer.setSize(sceneWidth, sceneHeight);
+      document.body.appendChild(renderer.domElement);
+
+      
+      // DECLARACION DE BASICOS
+
+      
+      // escenario
+      var leftBorder = getBorder("left", 1, 32, 5, -16, -0.5, 0,getWoodMaterial());//ancho, alto, ancho
+      var rightBorder = getBorder("right", 1, 32, 5, 16, -0.5, 0,getWoodMaterial());
+      var topBorder = getBorder("top", 31, 1, 5, 0, 15, 0,getWoodMaterial());
+      var gameoverBorder = getBorder("gameover", 33, 0.5, 5, 0, -16.5, 0,getmaterial1());
+      var floor = getFloor(30,32,0,0,getWoodMaterial());
+      
+      scene.add(leftBorder);
+      scene.add(rightBorder);
+      scene.add(topBorder);
+      scene.add(gameoverBorder);
+      scene.add(floor);
+
+      // jugador
+      var downBorder = getBorder("user", 9, 1, 2.5, 0, -15, 2,getBaseMaterial());
+
+      scene.add(downBorder);
+      
+      
+      var sphere = getSphere(getmaterial1());
+      scene.add(sphere);
+
+      
+      
+      // añadimos vidas
+      var  vidas1 = Vidas(-22,10);
+      var  vidas2 = Vidas(-22,5);
+      var  vidas3 = Vidas(-22,0);
+      scene.add(vidas1);
+      scene.add(vidas2);
+      scene.add(vidas3);
+      // ESCENARIO PARA VIDAS
+      var l = getBorder("l", 0.5, 13, 2, -23.5, 5, 0.5,getWoodMaterial());//ancho, alto, ancho
+      var r = getBorder("r", 0.5, 13, 2, -20, 5, 0.5,getWoodMaterial());
+      var t = getBorder("t", 3.5, 0.5, 2, -22, 11.25, 0.5,getWoodMaterial());
+      var d = getBorder("d", 3.5, 0.5, 2, -22, -1.25, 0.5,getWoodMaterial());
+      var f = getFloor(3,12,-22,5,getWoodMaterial());
+      scene.add(l);
+      scene.add(r);
+      scene.add(t);
+      scene.add(d);
+      scene.add(f);
+
+      // bloques a romper
+      blocks(blocks_f,scene,13,getmaterial1(),puntos3);
+      blocks(blocks_f,scene,10,getmaterial2(),puntos2);
+      blocks(blocks_f,scene,7,getmaterial1(),puntos2);
+      blocks(blocks_f,scene,4,getmaterial2(),puntos1);
+      // console.log(blocks_f);
+      
+      // luces
+      var light_bal = getLight_bal(scene,sphere,color_light);
+      var light = getLight();
+      
+      scene.add(light_bal);
+      scene.add(light);
+
+     
+      //console.log(downBorder.setSize)
+      // DECLARACION DE ARRAYS
+      var borders = [ leftBorder, rightBorder, topBorder, downBorder ];
+      
+      var vid_array = [vidas1,vidas2,vidas3];
+
+
+      document.onkeydown = function (ev) {
+                    switch (ev.keyCode) {
+                        // 32 space
+                        //37 izquierda
+                        //39 derecha
+                        case 32:
+                            move=true;
+                        break;
+                        case 37: // Movimiento izquierda
+                        // colocar condicionales de espacio para que no atraviese las paredes
+                        if(downBorder.position.x>=-10.1)
+                        {
+                           downBorder.position.x -= vel;
+                        }
+                           
+                        break;
+                        case 39: // Movimiento derecha
+                        if(downBorder.position.x<=10.1){
+                           downBorder.position.x += vel;
+                        }
+                           
+                        break;
+                    }
+                };
+      animate(sphere, borders,blocks_f, renderer, scene, camera,vid_array);
+   }
+   // FUNCION PARA AÑADIR BLOQUES POR FILA
+    function blocks(array, scene,y,material,puntos){
+
+        for(i=0;i<6;i++){
+            var brick_f1 = getBrick(4,2,4 , (-12+5*i),y,0, material);
+            array.push(brick_f1);
+            puntos.push(brick_f1);
+            
+        }
+    
+        for(obj=0;obj<array.length;obj++){
+            scene.add(array[obj]);
+        }
+        
+    }
+    
+   function animate(sphere, borders,blocks_f, renderer, scene, camera,vid_array) {
+      // IMPLEMENTACION DEL FALLO
+      if(vida >0){
+         if(sphere.position.y < -15.5){
+            console.log('FALLO')
+            move = false
+            sphere.position.z = 1;
+            sphere.position.y = -13;
+            sphere.position.x = 0;
+            vida -=1;
+            scene.remove(vid_array.pop());
+            
+            console.log('vidas',vid_array)
+         }
+      }
+      else{
+         window.alert('HAS PERDIDO')
+         location.reload();
+      }
+
+      
+      checkCollision(scene,sphere, borders,blocks_f);
+      if (move){
+         
+         sphere.position.x += stepX * dir_x;
+         sphere.position.y += stepY;
+      }
+      renderer.render(scene, camera);
+
+      renderer.setAnimationLoop( function() {
+         animate(sphere, borders,blocks_f, renderer, scene, camera,vid_array);
+      });
+   }
+
+   function getLight() {
+      var light = new THREE.DirectionalLight(0xffffff,0.7);
+      light.position.set(2, 2, 10);
+      light.castShadow = true;
+      light.shadow.camera.near = 0;
+      light.shadow.camera.far = 16;
+      light.shadow.camera.left = -15;
+      light.shadow.camera.right = 15;
+      light.shadow.camera.top = 20;
+      light.shadow.camera.bottom = -20;
+      light.shadow.mapSize.width = 4096;
+      light.shadow.mapSize.height = 4096;
+      var helper = new THREE.CameraHelper(light.shadow.camera);
+      return light;
+   }
+   function getLight_bal(scene,sphere,color) {
+      var spotLight = new THREE.PointLight( color, 1, 100 );
+      //spotLight.position.set( sphere.position.x, sphere.position.y, 4 );
+      spotLight.target = sphere;
+      spotLight.castShadow = true;
+      spotLight.shadow.camera.visible = true;
+      return spotLight;
+   }
+
+   function getSphere(material) {
+      var geometry = new THREE.SphereGeometry(1, 20, 20);
+      var mesh = new THREE.Mesh(geometry, material);
+      mesh.position.z = 1;
+      mesh.position.y = -13;
+      mesh.castShadow = true;
+      mesh.name = "sphere";
+
+      return mesh;
+
+   }
+   function Vidas(c_x,c_y){
+      var geometry = new THREE.SphereGeometry(1, 20, 20);
+      var material = new THREE.MeshBasicMaterial({color: 0xb4ff00 });
+      var mesh = new THREE.Mesh(geometry, material);
+      mesh.position.z = 1;
+      mesh.position.x = c_x;
+      mesh.position.y = c_y;
+      mesh.name = "vidas";
+      return mesh;
+   }
+
+   function getBrick(sx,sy,sz,pX,pY,pZ,material) {
+    var geometry = new THREE.BoxGeometry(sx, sy, sz);
+      var mesh = new THREE.Mesh(geometry, material);
+      mesh.receiveShadow = true;
+      mesh.position.set(pX, pY, pZ);
+      mesh.name = name;
+      return mesh;
+   }
+
+   function getFloor(sx,sy,x,y,material) {
+      var geometry = new THREE.PlaneGeometry(sx, sy);
+      var mesh = new THREE.Mesh(geometry, material);
+      mesh.receiveShadow = true;
+      mesh.position.x = x;
+      mesh.position.y = y;
+
+      return mesh;
+   }
+
+   function getBorder(name, x, y, z, posX, posY, posZ,material) {
+      var geometry = new THREE.BoxGeometry(x, y, z);
+      var mesh = new THREE.Mesh(geometry, material);
+      mesh.receiveShadow = true;
+      mesh.position.set(posX, posY, posZ);
+      mesh.name = name;
+
+      return mesh;
+   }
+
+   function getWoodMaterial() {
+      var texture = new THREE.TextureLoader().load("wood.png");
+      var material = new THREE.MeshPhysicalMaterial({
+         map : texture
+      });
+      material.map.wrapS = material.map.wrapT = THREE.RepeatWrapping;
+      material.map.repeat.set(4, 4);
+      material.side = THREE.DoubleSide;
+
+      return material;
+   }
+   function getBaseMaterial() {
+      var texture = new THREE.TextureLoader().load("bricks.jpg");
+      var material = new THREE.MeshPhysicalMaterial({
+         map : texture
+      });
+      material.map.wrapS = material.map.wrapT = THREE.RepeatWrapping;
+      material.map.repeat.set(4, 4);
+      material.side = THREE.DoubleSide;
+
+      return material;
+   }
+   function getmaterial1() {
+      var texture = new THREE.TextureLoader().load("texture.png");
+      var material = new THREE.MeshPhysicalMaterial({
+         map : texture
+      });
+      material.map.wrapS = material.map.wrapT = THREE.RepeatWrapping;
+      material.map.repeat.set(4, 4);
+      material.side = THREE.DoubleSide;
+
+      return material;
+   }
+   function getmaterial2() {
+      var texture = new THREE.TextureLoader().load("background.jpg");
+      var material = new THREE.MeshPhysicalMaterial({
+         map : texture
+      });
+      material.map.wrapS = material.map.wrapT = THREE.RepeatWrapping;
+      material.map.repeat.set(4, 4);
+      material.side = THREE.DoubleSide;
+
+      return material;
+   }
+   // para el angulo de rebote, si golpea calculo la distancia del centro del objeto a la pelota, si es pequeña no cambia si es grande combio el angulo de rebote
+   // para la velocidad de desplazamiento, si me desplazo mucho mas velocidad, cuando rebota y elimina el bloque, cuento el desplazamiento y la diferencia y cambio la velocidad.
+
+   function checkCollision(scene,sphere, borders,blocks_f) {
+      console.log('SCORE: ',puntaje)
+      
+      var originPosition = sphere.position.clone();
+
+      const positionAttribute = sphere.geometry.getAttribute( 'position' );
+      const localVertex = new THREE.Vector3();
+      const globalVertex = new THREE.Vector3();
+      for ( let vertexIndex = 0; vertexIndex < positionAttribute.count; vertexIndex ++ ) {
+         localVertex.fromBufferAttribute( positionAttribute, vertexIndex );
+         globalVertex.copy( localVertex ).applyMatrix4( sphere.matrixWorld );
+         var directionVector = globalVertex.sub(sphere.position);
+         var ray = new THREE.Raycaster(originPosition, directionVector.clone().normalize());
+         var collisionResults = ray.intersectObjects(borders);
+    
+         if (collisionResults.length > 0 && collisionResults[0].distance < directionVector.length()) {
+            // Collision detected
+            if (collisionResults[0].object.name == "left" || collisionResults[0].object.name == "right") {
+               stepX *= -1;
+            }
+            if (collisionResults[0].object.name == "user" || collisionResults[0].object.name == "top") {
+               stepY *= -1;
+               if(collisionResults[0].object.name == "user" ){            
+                  num_block= 0;
+                  puntaje = puntaje + puntos;
+                  puntos = 0;
+                  
+                  dist_centro = Math.abs(collisionResults[0].object.position.x - sphere.position.x)
+                  //console.log(dist_centro)
+                  if(2> dist_centro > 0.5){
+                     dir_x = 2;
+                     
+                  }
+                  else if(dist_centro > 2){
+                     dir_x = 4;
+                     
+                  }
+                  else if(dist_centro <= 0.5){
+                     dir_x = 1;
+                     
+                  }
+                  //console.log(dir_x)
+               }
+               if(Math.abs(sphere.position.x)< Math.abs(collisionResults[0].object.position.x )){
+                     stepX *= -1;
+                     // console.log(Math.abs(sphere.position.x))
+                     // console.log(Math.abs(collisionResults[0].object.position.x ))
+                  }
+                  else{
+                     stepX *= 1;
+                     // console.log(Math.abs(sphere.position.x))
+                     // console.log(Math.abs(collisionResults[0].object.position.x ))
+                  }
+            }            
+            break;
+
+         }
+         
+         var collisionResults_blocks = ray.intersectObjects(blocks_f);
+
+         if (collisionResults_blocks.length > 0 && collisionResults_blocks[0].distance < directionVector.length()) {
+
+            // conteo de bloques chocados
+            num_block += 1;
+            console.log('numero de bloques',num_block)
+            if (num_block>1){
+               
+               puntos = puntos * 2;
+            }
+            
+            // cambio de movimiento
+            stepY *= -1;
+            
+            // eliminamos bloque
+            obj_delete = blocks_f.indexOf(collisionResults_blocks[0].object);
+            scene.remove(collisionResults_blocks[0].object);
+            blocks_f.splice(obj_delete,1);
+
+
+            // Para movimiento dependiendo de donde golpee en el bloque
+            //calculamos distancia para bloques
+            dist_centro_block = Math.abs(collisionResults_blocks[0].object.position.y - sphere.position.y)
+
+            console.log('centroo: ',dist_centro_block)
+            if(dist_centro_block>=0.5){
+               stepY*=1;
+               stepX*=-1;
+            }
+            else{
+               stepY *=-1;
+               stepX *=-1;
+            }
+            
+            // Para puntuacion
+            if (puntos1.includes(collisionResults_blocks[0].object)) {
+               
+               puntos += 1
+            }
+            else if (puntos2.includes(collisionResults_blocks[0].object)) {
+               
+               puntos += 2
+            }
+            else if (puntos3.includes(collisionResults_blocks[0].object)) {
+               
+               puntos += 3
+            }
+         }
+
+         
+      }
+   }
+</script>
+</head>
+
+<body onload="init()"></body>
+
+</html>
